@@ -28,6 +28,13 @@ class Node(object):
             node._validate_path(start_node)
 
     def submit(self, request, response=None):
+        try:
+            response = self._guarded_submit(request, response)
+        except Exception as e:
+            response = self._guarded_on_exception(request, response, e)
+        return response
+
+    def _guarded_submit(self, request, response):
         if response is None:
             response = Response()
         try:
@@ -40,8 +47,20 @@ class Node(object):
             raise BadHandle('Node handle did not return or raise a response.')
         if not bounce:
             for node in self.nodes:
-                response = node.submit(request, response)
+                try:
+                    response = node.submit(request, response)
+                except Exception as e:
+                    response = self.on_exception(request, response, e)
         return response
 
     def handle(self, request, response):
         return response
+
+    def _guarded_on_exception(self, request, response, exception):
+        try:
+            return self.on_exception(request, response, exception)
+        except Response as r:
+            return r
+
+    def on_exception(self, request, response, exception):
+        raise

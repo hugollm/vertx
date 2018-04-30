@@ -139,3 +139,57 @@ class HandleTestCase(TestCase):
         response = Response()
         node_response = node.handle(request, response)
         self.assertIs(node_response, response)
+
+
+class OnExceptionTestCase(TestCase):
+
+    def test_on_exception_is_called_if_an_exception_happens_on_node_handle(self):
+        node = Node()
+        request = Request({})
+        response = Response()
+        exception = Exception()
+        node.handle = Mock(side_effect=exception)
+        node.on_exception = Mock()
+        node.submit(request, response)
+        node.on_exception.assert_called_with(request, response, exception)
+
+    def test_request_flow_continues_normally_if_on_exception_does_not_raise(self):
+        root, a, b = Node(), Node(), Node()
+        expected_response = Response()
+        root.link(a)
+        root.link(b)
+        root.on_exception = Mock(return_value=Response())
+        a.handle = Mock(side_effect=Exception())
+        b.handle = Mock(return_value=expected_response)
+        response = root.submit(Request({}))
+        self.assertEqual(b.handle.call_count, 1)
+        self.assertIs(response, expected_response)
+
+    def test_on_exception_method_may_keep_the_response(self):
+        node = Node()
+        request = Request({})
+        original_response = Response()
+        exception = Exception()
+        node.handle = Mock(side_effect=exception)
+        node.on_exception = Mock(return_value=original_response)
+        response = node.submit(request, original_response)
+        self.assertIs(response, original_response)
+
+    def test_on_exception_method_may_change_the_response(self):
+        node = Node()
+        request = Request({})
+        original_response = Response()
+        exception = Exception()
+        node.handle = Mock(side_effect=exception)
+        node.on_exception = Mock(return_value=Response())
+        response = node.submit(request, original_response)
+        self.assertIsNot(response, original_response)
+
+    def test_on_exception_method_may_raise_response(self):
+        node = Node()
+        request = Request({})
+        expected_response = Response()
+        node.handle = Mock(side_effect=Exception())
+        node.on_exception = Mock(side_effect=expected_response)
+        response = node.submit(request)
+        self.assertIs(response, expected_response)
